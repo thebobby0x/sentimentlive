@@ -32,7 +32,7 @@ Next.js 15 · Supabase Realtime · Claude Haiku · CALL-E
 
 ### Repo
 
-https://github.com/studio0x/sentimentlive
+https://github.com/thebobby0x/sentimentlive
 
 ### Demo
 
@@ -52,7 +52,7 @@ An event planner pushes a question from their dashboard. CALL-E calls every opte
 - **CALL-E usage:** `POST /v1/calls` per attendee, transcript via webhook
 - **Stack:** Next.js 15, Supabase Realtime, Claude Haiku
 - **Use case:** Live event management — course-correct in real time, not after
-- **Repo:** https://github.com/studio0x/sentimentlive
+- **Repo:** https://github.com/thebobby0x/sentimentlive
 ```
 
 ---

@@ -18,14 +18,17 @@ export function flagLabel(flag: ActionFlag): string {
   }
 }
 
-export function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
+export function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'just now';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'just now';
+  const diffMs = Date.now() - d.getTime();
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24) return `${diffHr}h ago`;
-  return new Date(iso).toLocaleDateString();
+  return d.toLocaleDateString();
 }
 
 export function flagColor(flag: ActionFlag): string {

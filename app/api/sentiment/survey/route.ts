@@ -31,17 +31,17 @@ export async function GET(request: NextRequest) {
     .from('survey_questions')
     .select('*')
     .eq('survey_id', surveyId)
-    .order('sort_order');
+    .order('sequence_order');
 
   // Fetch insights, join question text
   const { data: insightsRaw } = await supabase
     .from('sentiment_insights')
     .select('*')
     .eq('survey_id', surveyId)
-    .order('last_updated', { ascending: false });
+    .order('updated_at', { ascending: false });
 
   const questionMap = new Map(
-    (questions ?? []).map((q: { id: string; text: string }) => [q.id, q.text])
+    (questions ?? []).map((q: { id: string; question_text: string }) => [q.id, q.question_text])
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const insights = (insightsRaw ?? []).map((i: any) => ({

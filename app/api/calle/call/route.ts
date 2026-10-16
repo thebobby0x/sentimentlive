@@ -72,11 +72,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ dispatched: 0, results: [] });
   }
 
-  // Build the webhook URL — must be publicly reachable (ngrok in dev)
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    `https://${req.headers.get('host') ?? 'localhost:3000'}`;
-  const webhookUrl = `${appUrl}/api/calle/webhook`;
+  // Build the webhook URL — must be publicly reachable by CALL-E.
+  // Order: explicit NEXT_PUBLIC_APP_URL → Vercel's stable production domain
+  // (auto-set on Vercel) → the request host. `||` so an empty value falls through.
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : `https://${req.headers.get('host') ?? 'localhost:3000'}`)
+  ).replace(/\/+$/, '');
+  const webhookSecret = process.env.CALLE_WEBHOOK_SECRET;
+  const webhookUrl = webhookSecret
+    ? `${appUrl}/api/calle/webhook?token=${encodeURIComponent(webhookSecret)}`
+    : `${appUrl}/api/calle/webhook`;
 
   const results: CallDispatch[] = await Promise.all(
     optIns.map(async (optIn: { id: string; phone_number: string }) => {

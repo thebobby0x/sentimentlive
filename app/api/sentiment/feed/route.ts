@@ -18,16 +18,16 @@ export async function GET(request: NextRequest) {
   // Get question IDs for this survey
   const { data: questions } = await supabase
     .from('survey_questions')
-    .select('id, text')
+    .select('id, question_text')
     .eq('survey_id', surveyId);
 
   if (!questions || questions.length === 0) {
     return NextResponse.json([]);
   }
 
-  const questionIds = questions.map((q: { id: string; text: string }) => q.id);
+  const questionIds = questions.map((q: { id: string; question_text: string }) => q.id);
   const questionMap = new Map(
-    questions.map((q: { id: string; text: string }) => [q.id, q.text])
+    questions.map((q: { id: string; question_text: string }) => [q.id, q.question_text])
   );
 
   // Fetch latest responses for those questions
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     .from('survey_responses')
     .select('*')
     .in('question_id', questionIds)
-    .order('created_at', { ascending: false })
+    .order('received_at', { ascending: false })
     .limit(FEED_LIMIT);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

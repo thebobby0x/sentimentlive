@@ -141,6 +141,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 CALLE_API_KEY=your-calle-api-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
+CALLE_WEBHOOK_SECRET=<openssl rand -hex 32>
 NEXT_PUBLIC_APP_URL=https://your-public-url.com
 NEXT_PUBLIC_SURVEY_ID=d0000001-0000-0000-0000-000000000001
 ```
@@ -153,12 +154,12 @@ npm run dev
 
 Open `http://localhost:3000/demo` — the live dashboard with seeded data.
 
-### 4. Test a voice call (requires ngrok for local dev)
+### 4. Test a voice call
 
-```bash
-ngrok http 3000
-# Set NEXT_PUBLIC_APP_URL to your ngrok URL
-```
+CALL-E must be able to reach `/api/calle/webhook` over the public internet, so
+test calls against the **Vercel deployment** — see [DEPLOYMENT.md](DEPLOYMENT.md).
+(For throwaway local testing only, a tunnel such as `ngrok http 3000` with
+`NEXT_PUBLIC_APP_URL` set to the tunnel URL still works; never use it for an event.)
 
 Then trigger a call:
 
@@ -233,3 +234,14 @@ MIT
 ---
 
 *Built with [CALL-E](https://calle.ai) · [Anthropic Claude](https://anthropic.com) · [Supabase](https://supabase.com)*
+
+---
+
+## Build dates
+
+- Code submitted for CALL-E: Your Code Is Calling (deadline Sep 14, 2026). The first commit in this repository is the snapshot saved on Sep 13, 2026, before the deadline.
+- The repository link on Devpost pointed here, but the code was not pushed at submission time. Both commits were pushed on Oct 16, 2026.
+- The second commit contains later polish made Sep 14 to Sep 28, 2026 (AI-written recommendations in the insight agent, webhook hardening, health check route). It is kept separate so judges can see exactly what was submitted.
+
+Demo video: https://www.youtube.com/watch?v=qIZP5ARaXk4
+Devpost: https://devpost.com/software/sentimentlive-by-studio0x

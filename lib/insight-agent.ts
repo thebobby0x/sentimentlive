@@ -84,6 +84,17 @@ export async function refreshInsight(
 ): Promise<void> {
   const supabase = createServiceClient();
 
+  // Fetch question text so we can give Claude context for the recommendation
+  const { data: questionRow } = await supabase
+    .from('survey_questions')
+    .select('question_text, text')
+    .eq('id', questionId)
+    .single();
+  const questionText: string =
+    (questionRow as Record<string, unknown>)?.question_text as string ??
+    (questionRow as Record<string, unknown>)?.text as string ??
+    'the event experience';
+
   const { data: responses, error } = await supabase
     .from('survey_responses')
     .select('sentiment_score, action_flag, response_text')
@@ -114,25 +125,86 @@ export async function refreshInsight(
     .filter((q): q is string => Boolean(q))
     .slice(0, 3);
 
-  // Derive a short recommended action from the flag
-  const recommended_action =
-    action_flag === 'act'
-      ? 'Immediate attention needed — escalate to event team.'
-      : action_flag === 'watch'
-      ? 'Monitor closely — check again in 15 minutes.'
-      : 'All good — no action required.';
+  // AI-generated contextual recommendation based on real response content
+  const recommended_action = await generateRecommendation(
+    questionText,
+    action_flag,
+    sorted.slice(0, 3).map((r) => r.response_text), // worst responses first (sorted asc)
+  );
 
   await supabase.from('sentiment_insights').upsert(
     {
       survey_id: surveyId,
       question_id: questionId,
-      avg_score,
+      avg_sentiment: avg_score,
       response_count,
       action_flag,
-      sample_quotes,
-      recommended_action,
-      last_updated: new Date().toISOString(),
+      top_themes: sample_quotes,
+      recommendation: recommended_action,
+      updated_at: new Date().toISOString(),
     },
     { onConflict: 'survey_id,question_id' },
   );
+}
+
+/**
+ * Ask Claude Haiku for a specific, actionable one-liner given the question
+ * context and worst attendee responses. Falls back to static strings on error.
+ */
+async function generateRecommendation(
+  questionText: string,
+  flag: ActionFlag,
+  worstResponses: string[],
+): Promise<string> {
+  const staticFallback =
+    flag === 'act'
+      ? 'Immediate attention needed — escalate to event team.'
+      : flag === 'watch'
+      ? 'Monitor closely — check again in 15 minutes.'
+      : 'All good — no action required.';
+
+  if (!ANTHROPIC_API_KEY || flag === 'ok') return staticFallback;
+
+  const excerpts = worstResponses
+    .filter(Boolean)
+    .map((r, i) => `${i + 1}. "${r}"`)
+    .join('\n');
+
+  try {
+    const res = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        system:
+          'You are an event operations advisor at a live conference. ' +
+          'Given a survey question and attendee feedback, write ONE specific, actionable ' +
+          'instruction (max 20 words) for an event planner to act on RIGHT NOW. ' +
+          'Be concrete — name what to fix, where, or who to contact. No generic advice. ' +
+          'Respond with the instruction only, no prefix or explanation.',
+        messages: [
+          {
+            role: 'user',
+            content:
+              `Question: "${questionText}"\n` +
+              `Status: ${flag === 'act' ? 'URGENT — action required' : 'WATCH — trending negative'}\n` +
+              `Most negative responses:\n${excerpts}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+
+    const data = (await res.json()) as { content: Array<{ text: string }> };
+    const text = data.content?.[0]?.text?.trim() ?? '';
+    return text || staticFallback;
+  } catch {
+    return staticFallback;
+  }
 }

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { scoreResponse, refreshInsight } from '@/lib/insight-agent';
 
@@ -24,6 +25,15 @@ import { scoreResponse, refreshInsight } from '@/lib/insight-agent';
  * }
  */
 export async function POST(req: NextRequest) {
+  // Shared-secret check. /api/calle/call appends ?token=<CALLE_WEBHOOK_SECRET>
+  // to the callback URL it hands CALL-E, so anyone else POSTing fake
+  // transcripts at the public URL is rejected. Enforced only when the secret is set.
+  const secret = process.env.CALLE_WEBHOOK_SECRET;
+  if (secret && !tokenMatches(req.nextUrl.searchParams.get('token'), secret)) {
+    console.warn('[calle/webhook] rejected: bad or missing token');
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -89,9 +99,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Refresh the aggregate insight (non-blocking — don't fail the webhook)
-  refreshInsight(survey_id, question_id).catch((err) =>
-    console.error('[calle/webhook] refreshInsight failed', err),
+  // Refresh the aggregate insight after the response is sent (don't fail the
+  // webhook). after() keeps the Vercel function alive until this finishes; a
+  // bare fire-and-forget promise can be frozen mid-flight once we return.
+  after(() =>
+    refreshInsight(survey_id, question_id).catch((err) =>
+      console.error('[calle/webhook] refreshInsight failed', err),
+    ),
   );
 
   console.log(
@@ -99,6 +113,13 @@ export async function POST(req: NextRequest) {
   );
 
   return NextResponse.json({ ok: true, score, action_flag });
+}
+
+function tokenMatches(given: string | null, expected: string): boolean {
+  if (!given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**
